@@ -14,14 +14,14 @@ const mockUserUpdate = jest.fn();
 
 jest.mock("../lib/prisma", () => ({
   prisma: {
-    round: { findUnique: mockRoundFindUnique, update: mockRoundUpdate },
-    prediction: { findUnique: mockPredictionFindUnique, findMany: mockPredictionFindMany, create: mockPredictionCreate },
-    user: { findUnique: mockUserFindUnique, update: mockUserUpdate },
+    round: { findUnique: (...a: any[]) => mockRoundFindUnique(...a), update: (...a: any[]) => mockRoundUpdate(...a) },
+    prediction: { findUnique: (...a: any[]) => mockPredictionFindUnique(...a), findMany: (...a: any[]) => mockPredictionFindMany(...a), create: (...a: any[]) => mockPredictionCreate(...a) },
+    user: { findUnique: (...a: any[]) => mockUserFindUnique(...a), update: (...a: any[]) => mockUserUpdate(...a) },
     $transaction: (fn: (tx: any) => Promise<any>) =>
       fn({
-        round: { findUnique: mockRoundFindUnique, update: mockRoundUpdate },
-        prediction: { findUnique: mockPredictionFindUnique, findMany: mockPredictionFindMany, create: mockPredictionCreate },
-        user: { findUnique: mockUserFindUnique, update: mockUserUpdate },
+        round: { findUnique: (...a: any[]) => mockRoundFindUnique(...a), update: (...a: any[]) => mockRoundUpdate(...a) },
+        prediction: { findUnique: (...a: any[]) => mockPredictionFindUnique(...a), findMany: (...a: any[]) => mockPredictionFindMany(...a), create: (...a: any[]) => mockPredictionCreate(...a) },
+        user: { findUnique: (...a: any[]) => mockUserFindUnique(...a), update: (...a: any[]) => mockUserUpdate(...a) },
       }),
   },
 }));
