@@ -15,10 +15,18 @@ import {
   decFixed,
 } from "../utils/decimal.util";
 import { Decimal } from "@prisma/client/runtime/library";
-import { RoundPriceRange, UserPriceRange } from "../types/round.types";
+import { ValidationError } from "../utils/errors";
+import { RoundLifecycleOutcome, RoundPriceRange, UserPriceRange } from "../types/round.types";
 import { parseRoundPriceRanges, validateUserPriceRange } from "../utils/price-range.util";
 
-import { RoundLifecycleOutcome } from "../types/round.types";
+function isValidRange(range: any): range is RoundPriceRange {
+  return (
+    range &&
+    Number.isFinite(range.min) &&
+    Number.isFinite(range.max) &&
+    range.min < range.max
+  );
+}
 
 export class ResolutionService {
   /**
@@ -260,11 +268,26 @@ export class ResolutionService {
     const finalPriceDec = new Decimal(finalPrice);
     const priceRanges = parseRoundPriceRanges(round.priceRanges);
 
-    // Find winning range
-    const winningRange = priceRanges.find((range) => {
+    if (priceRanges.length === 0) {
+      throw new ValidationError("LEGENDS round has no configured price ranges");
+    }
+
+    const invalidRange = priceRanges.find((range) => !isValidRange(range));
+    if (invalidRange) {
+      throw new ValidationError("LEGENDS round has invalid price range data");
+    }
+
+    const sortedRanges = [...priceRanges].sort((a, b) => a.min - b.min);
+
+    // Find winning range with inclusive lower bound and exclusive upper bound,
+    // except for the final range whose upper bound is inclusive.
+    const winningRange = sortedRanges.find((range, index) => {
+      const isLast = index === sortedRanges.length - 1;
       const min = new Decimal(range.min);
       const max = new Decimal(range.max);
-      return finalPriceDec.gte(min) && finalPriceDec.lt(max);
+      return isLast
+        ? finalPriceDec.gte(min) && finalPriceDec.lte(max)
+        : finalPriceDec.gte(min) && finalPriceDec.lt(max);
     });
 
     if (!winningRange) {
@@ -296,7 +319,7 @@ export class ResolutionService {
     }
 
     // Calculate total pool and winning pool (decimal-safe)
-    const totalPool = priceRanges.reduce(
+    const totalPool = sortedRanges.reduce(
       (sum, range) => decAdd(sum, range.pool),
       toDecimal(0),
     );
@@ -304,7 +327,26 @@ export class ResolutionService {
     const decLosingPool = toDecimal(totalPool).sub(decWinningPool);
 
     if (decEq(decWinningPool, 0)) {
-      logger.warn(`Round ${round.id}: No winners in range, no payouts`);
+      for (const prediction of round.predictions) {
+        await prisma.prediction.update({
+          where: { id: prediction.id },
+          data: {
+            won: false,
+            payout: 0,
+          },
+        });
+
+        await prisma.user.update({
+          where: { id: prediction.userId },
+          data: {
+            streak: 0,
+          },
+        });
+      }
+
+      logger.info(
+        `Round ${round.id}: Winning range had no predictions, all predictions marked as losses`,
+      );
       return;
     }
 

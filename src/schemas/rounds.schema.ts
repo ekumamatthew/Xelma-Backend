@@ -27,7 +27,28 @@ export const startRoundSchema = z.object({
   duration: z
     .number()
     .positive('Invalid duration'),
-  priceRanges: z.array(priceRangeSchema).optional(),
+  priceRanges: z.array(priceRangeSchema).min(2, 'LEGENDS mode requires at least 2 ranges').optional(),
+}).superRefine((data, ctx) => {
+  if (data.mode !== 1 && data.priceRanges) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'priceRanges is only supported when mode is LEGENDS (1)',
+      path: ['priceRanges'],
+    });
+  }
+
+  if (data.mode === 1 && data.priceRanges?.length) {
+    const sorted = [...data.priceRanges].sort((a, b) => a.min - b.min);
+    for (let i = 1; i < sorted.length; i++) {
+      if (sorted[i].min < sorted[i - 1].max) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'LEGENDS price ranges must not overlap',
+          path: ['priceRanges', i],
+        });
+      }
+    }
+  }
 });
 
 export const resolveRoundSchema = z.object({

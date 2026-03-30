@@ -12,6 +12,7 @@ import {
   validateUserPriceRange,
 } from "../utils/price-range.util";
 import type { Prisma } from "@prisma/client";
+import { ValidationError } from "../utils/errors";
 
 export class PredictionService {
   /**
@@ -60,11 +61,15 @@ export class PredictionService {
           }
         } else if (round.mode === "LEGENDS") {
           if (!priceRange) {
-            throw new Error("Price range is required for LEGENDS mode");
+            throw new ValidationError(
+              "Price range is required for LEGENDS mode",
+            );
           }
           const priceRangeValidation = validateUserPriceRange(priceRange);
           if (!priceRangeValidation.valid) {
-            throw new Error(`Invalid price range: ${priceRangeValidation.error}`);
+            throw new ValidationError(
+              `Price range must include numeric min and max with min < max`,
+            );
           }
           const ranges = parseRoundPriceRanges(round.priceRanges);
           const validRange = findRangeByBounds(
@@ -73,7 +78,7 @@ export class PredictionService {
             priceRange.max,
           );
           if (!validRange) {
-            throw new Error("Invalid price range");
+            throw new ValidationError("Invalid price range for this round");
           }
         } else {
           throw new Error("Invalid game mode");

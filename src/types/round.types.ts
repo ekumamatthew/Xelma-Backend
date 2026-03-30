@@ -65,6 +65,7 @@ export interface StartRoundRequestBody {
   startPrice: string;
   durationLedgers: number;
   mode: GameMode;
+  priceRanges?: { min: number; max: number }[];
 }
 
 export interface StartRoundResponse {
@@ -77,7 +78,8 @@ export interface StartRoundResponse {
 
 export interface SubmitPredictionRequestBody {
   roundId: string;
-  side: BetSide;
+  side?: BetSide;
+  priceRange?: { min: number; max: number };
   amount: number;
   mode: GameMode;
 }
@@ -99,6 +101,7 @@ export interface ResolveRoundRequestBody {
 export interface ResolveRoundResponse {
   roundId: string;
   outcome: BetSide | null;
+  winningRange?: { min: number; max: number } | null;
   winnersCount: number;
   losersCount: number;
   txHash: string;
